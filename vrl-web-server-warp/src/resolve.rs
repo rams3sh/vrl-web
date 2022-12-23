@@ -30,7 +30,6 @@ fn resolve(input: Input) -> Outcome {
     // as these values are basically constants. This is fine for now, as
     // performance shouldn't be an issue in the near term, but low-hanging fruit
     // for optimization later.
-    let mut state = state::ExternalEnv::default();
     let mut runtime = Runtime::new(state::Runtime::default());
 
     // Default to default timezone if none
@@ -43,8 +42,8 @@ fn resolve(input: Input) -> Outcome {
 
     // TODO return warnings too
     let (program, _warnings) =
-        match vrl::compile_with_state(&input.program, &vrl_stdlib::all(), &mut state) {
-            Ok(program) => program,
+        match vrl::compile(&input.program, &vrl_stdlib::all()) {
+            Ok(result) => (result.program, result.warnings),
             Err(diagnostics) => {
                 let msg = Formatter::new(&input.program, diagnostics).to_string();
                 return Outcome::Error(msg);
@@ -58,6 +57,8 @@ fn resolve(input: Input) -> Outcome {
         metadata: &mut metadata,
         secrets: &mut secrets,
     };
+
+    println!("{:#?}", target);
 
     match runtime.resolve(&mut target, &program, &time_zone) {
         Ok(result) => Outcome::Success {

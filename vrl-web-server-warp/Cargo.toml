@@ -12,7 +12,10 @@ structopt = { version = "0.3.25", default-features = false }
 tokio = { version = "1.14.0", default-features = false, features = ["full"] }
 warp = "0.3.2"
 
-value = { git = "https://github.com/vectordotdev/vector", ref = "v0.22.2" }
-vector_common = { git = "https://github.com/vectordotdev/vector", ref = "v0.22.2" }
-vrl = { git = "https://github.com/vectordotdev/vector", ref = "v0.22.2" }
-vrl-stdlib = { git = "https://github.com/vectordotdev/vector", ref = "v0.22.2" }
+# v0.24.1
+value = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
+vector_common = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
+vrl = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
+vrl-stdlib = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
+
+bytes = "1.2.1"

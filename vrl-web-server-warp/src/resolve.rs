@@ -3,8 +3,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, state, value, Runtime, TargetValueRef};
+use vrl::{diagnostic::Formatter, state, value, Program, Runtime, TargetValueRef};
 use warp::{reply::json, Reply};
+
+use log::{debug, error, info, warn};
+use anyhow::{anyhow, Result};
+use lru::LruCache;
+use std::{cell::RefCell, time::Instant};
+
+thread_local! {
+    pub static RUNTIME: RefCell<Runtime> = RefCell::new(Runtime::new(state::Runtime::default()));
+}
 
 // The VRL program plus (optional) event plus (optional) time zone
 #[derive(Deserialize, Serialize)]
@@ -24,52 +33,99 @@ enum Outcome {
 
 // The VRL resolution logic
 fn resolve(input: Input) -> Outcome {
+    thread_local!(
+        static CACHE: RefCell<LruCache<String, Result<Program, String>>> =
+            RefCell::new(LruCache::new(std::num::NonZeroUsize::new(400).unwrap()));
+    );
+
     let mut value: Value = input.event.unwrap_or(value!({}));
+    let program = input.program.as_str();
 
-    // TODO: instantiate this logic elsewhere rather than for each invocation,
-    // as these values are basically constants. This is fine for now, as
-    // performance shouldn't be an issue in the near term, but low-hanging fruit
-    // for optimization later.
-    let mut runtime = Runtime::new(state::Runtime::default());
+    let res = CACHE.with(|c| {
+        let mut cache_ref = c.borrow_mut();
+        let stored_result = (*cache_ref).get(program);
 
-    // Default to default timezone if none
-    let time_zone_str = input.tz.unwrap_or_default();
-
-    let time_zone = match TimeZone::parse(&time_zone_str) {
-        Some(tz) => tz,
-        None => TimeZone::Local,
-    };
-
-    // TODO return warnings too
-    let (program, _warnings) =
-        match vrl::compile(&input.program, &vrl_stdlib::all()) {
-            Ok(result) => (result.program, result.warnings),
-            Err(diagnostics) => {
-                let msg = Formatter::new(&input.program, diagnostics).to_string();
-                return Outcome::Error(msg);
-            }
+        let start = Instant::now();
+        let compiled = match stored_result {
+            Some(compiled) => match compiled {
+                Ok(compiled) => Ok(compiled),
+                Err(e) => {
+                    return Err(anyhow!(e.clone()));
+                }
+            },
+            None => match vrl::compile(program, &vrl_stdlib::all()) {
+                Ok(result) => {
+                    debug!(
+                        "Compiled a vrl program ({}), took {:?}",
+                        program
+                            .lines()
+                            .into_iter()
+                            .skip(1)
+                            .next()
+                            .unwrap_or("expansion"),
+                        start.elapsed()
+                    );
+                    (*cache_ref).put(program.to_string(), Ok(result.program));
+                    if result.warnings.len() > 0 {
+                        warn!("{:?}", result.warnings);
+                    }
+                    match (*cache_ref).get(program) {
+                        Some(compiled) => match compiled {
+                            Ok(compiled) => Ok(compiled),
+                            Err(e) => {
+                                return Err(anyhow!(e.clone()));
+                            }
+                        },
+                        None => unreachable!(),
+                    }
+                }
+                Err(diagnostics) => {
+                    let msg = Formatter::new(&program, diagnostics).to_string();
+                    (*cache_ref).put(program.to_string(), Err(msg.clone()));
+                    Err(anyhow!(msg))
+                }
+            },
         };
 
-    let mut metadata = Value::Object(BTreeMap::new());
-    let mut secrets = Secrets::new();
-    let mut target = TargetValueRef {
-        value: &mut value,
-        metadata: &mut metadata,
-        secrets: &mut secrets,
-    };
+        if compiled.is_err() {
+            return Ok(Outcome::Error(compiled.err().unwrap().to_string()));
+        }
+        let compiled = compiled.unwrap();
 
-    println!("{:#?}", target);
+        let mut metadata = ::value::Value::Object(BTreeMap::new());
+        let mut secrets = ::value::Secrets::new();
+        let mut target = TargetValueRef {
+            value: &mut value,
+            metadata: &mut metadata,
+            secrets: &mut secrets,
+        };
 
-    match runtime.resolve(&mut target, &program, &time_zone) {
-        Ok(result) => Outcome::Success {
-            output: result,
-            // VRL's resolve function takes a mutable event, thus this clone
-            // operation is actually on the mutated event, which may not be
-            // immediately apparent here.
-            result: value.clone(),
-        },
-        Err(err) => Outcome::Error(err.to_string()),
-    }
+        let time_zone_str = Some("tt".to_string()).unwrap_or_default();
+
+        let time_zone = match TimeZone::parse(&time_zone_str) {
+            Some(tz) => tz,
+            None => TimeZone::Local,
+        };
+
+        let result = RUNTIME.with(|r| {
+            let mut runtime = r.borrow_mut();
+
+            match (*runtime).resolve(&mut target, &compiled, &time_zone) {
+                Ok(result) => Ok(result),
+                Err(err) => Err(err.to_string()),
+            }
+        });
+
+        match result {
+            Ok(result) => Ok(Outcome::Success {
+                output: result,
+                result: value,
+            }),
+            Err(err) => Ok(Outcome::Error(err)),
+        }
+    }).unwrap();
+
+    res
 }
 
 // The VRL resolution logic as an HTTP handler

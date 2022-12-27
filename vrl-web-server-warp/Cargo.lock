@@ -43,6 +43,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cb2f989d18dd141ab8ae82f64d1a8cdd37e0840f73a406896cf5e99502fab61"
+
+[[package]]
 name = "anymap"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -850,6 +856,9 @@ name = "hashbrown"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db0d4cf898abf0081f964436dc980e96670a0f36863e4b83aaacdb65c9d7ccc3"
+dependencies = [
+ "ahash",
+]
 
 [[package]]
 name = "headers"
@@ -1202,6 +1211,15 @@ dependencies = [
  "snafu",
  "vector_config",
  "vector_config_macros",
+]
+
+[[package]]
+name = "lru"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6e8aaa3f231bb4bd57b84b2d5dc3ae7f350265df8aa96492e0bc394a1571909"
+dependencies = [
+ "hashbrown",
 ]
 
 [[package]]
@@ -2756,8 +2774,11 @@ dependencies = [
 name = "vrl-server"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bytes",
  "http",
+ "log",
+ "lru",
  "pretty_env_logger",
  "serde",
  "serde_json",

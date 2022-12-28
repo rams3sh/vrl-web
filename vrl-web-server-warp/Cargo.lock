@@ -2777,6 +2777,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "http",
+ "lazy_static",
  "log",
  "lru",
  "pretty_env_logger",

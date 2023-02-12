@@ -13,9 +13,16 @@ use lru::LruCache;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::{cell::RefCell, time::Instant};
+use crate::bit_and::BitwiseAnd;
 
 thread_local! {
     pub static RUNTIME: RefCell<Runtime> = RefCell::new(Runtime::new(state::Runtime::default()));
+}
+
+pub fn custom_vrl_functions() -> Vec<Box<dyn vrl::Function>> {
+    vec![
+        Box::new(BitwiseAnd) as _,
+    ]
 }
 
 // The VRL program plus (optional) event plus (optional) time zone
@@ -49,6 +56,9 @@ fn resolve(input: Input) -> Outcome {
 
     let stored_result = (*cache_ref).get(program);
 
+    let mut functions = vrl_stdlib::all();
+    functions.append(&mut custom_vrl_functions());
+
     let start = Instant::now();
     let compiled = match stored_result {
         Some(compiled) => match compiled {
@@ -57,7 +67,7 @@ fn resolve(input: Input) -> Outcome {
                 return Outcome::Error(e.clone());
             }
         },
-        None => match vrl::compile(program, &vrl_stdlib::all()) {
+        None => match vrl::compile(program, &functions) {
             Ok(result) => {
                 debug!(
                     "Compiled a vrl program ({}), took {:?}",

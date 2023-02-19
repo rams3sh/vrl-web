@@ -6,7 +6,8 @@ edition = "2021"
 [dependencies]
 http = "0.2.8"
 pretty_env_logger = "0.4.0"
-serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+rust_decimal = { version = "1" }
+serde = { version = "1.0.152", default-features = false, features = ["derive"] }
 serde_json = "1.0.71"
 structopt = { version = "0.3.25", default-features = false }
 tokio = { version = "1.14.0", default-features = false, features = ["full"] }
@@ -18,9 +19,9 @@ log = "^0.4"
 lazy_static = "1.4.0"
 
 # v0.24.1
-value = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
-vector_common = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
-vrl = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
-vrl-stdlib = { git = "https://github.com/vectordotdev/vector", rev = "8935681" }
+value = { git = "https://github.com/vectordotdev/vector", rev = "a149be" }
+vector-common = { git = "https://github.com/vectordotdev/vector", rev = "a149be" }
+vrl = { git = "https://github.com/vectordotdev/vector", rev = "a149be" }
+vrl-stdlib = { git = "https://github.com/vectordotdev/vector", rev = "a149be" }
 
 bytes = "1.2.1"
